@@ -1,0 +1,59 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract assets.zip
+        run: |
+          if [ ! -f assets.zip ]; then
+            echo "assets.zip not found — skip unzip (use existing assets/ if present)"
+            exit 0
+          fi
+          unzip -o assets.zip
+          # zip 内可能是 assets/zc_*.jpg，也可能是根目录 zc_*.jpg
+          if [ ! -d assets ] && ls zc_*.jpg >/dev/null 2>&1; then
+            mkdir -p assets
+            mv zc_*.jpg assets/
+          fi
+          if [ ! -d assets ]; then
+            echo "Error: assets/ folder missing after unzip"
+            exit 1
+          fi
+          echo "Extracted $(ls assets/zc_*.jpg 2>/dev/null | wc -l) frames into assets/"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
